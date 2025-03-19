@@ -1,31 +1,53 @@
-# app.py
+<div id="twitter-fields" class="form-container">
+  <h3 class="font-medium">Twitter Input Fields</h3>
+  <form id="twitter-form" action="/predict_twitter/" method="post"> 
+    {% csrf_token %}
 
-from flask import Flask, request, jsonify, render_template
-import pickle
-import numpy as np
+    <label for="sex_code">Sex Code:</label>
+    <input type="number" id="sex_code" name="sex_code" placeholder="Sex Code" required>
 
-# Load the trained model
-model_path = 'model.pkl'
-with open(model_path, 'rb') as file:
-    model = pickle.load(file)
+    <label for="statuses_count">Statuses Count:</label>
+    <input type="number" id="statuses_count" name="statuses_count" placeholder="Statuses Count" required>
 
-app = Flask(__name__)
+    <label for="followers_count">Followers Count:</label>
+    <input type="number" id="followers_count" name="followers_count" placeholder="Followers Count" required>
 
-@app.route('/')
-def home():
-    return render_template('index.html')
+    <label for="friends_count">Friends Count:</label>
+    <input type="number" id="friends_count" name="friends_count" placeholder="Friends Count" required>
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    # Extract data from form
-    int_features = [int(x) for x in request.form.values()]
-    final_features = [np.array(int_features)]
-    
-    # Make prediction
-    prediction = model.predict(final_features)
-    output = 'Placed' if prediction[0] == 1 else 'Not Placed'
+    <label for="favourites_count">Favourites Count:</label>
+    <input type="number" id="favourites_count" name="favourites_count" placeholder="Favourites Count" required>
 
-    return render_template('index.html', prediction_text='Prediction: {}'.format(output))
+    <label for="listed_count">Listed Count:</label>
+    <input type="number" id="listed_count" name="listed_count" placeholder="Listed Count" required>
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    <label for="lang_code">Language Code:</label>
+    <input type="text" id="lang_code" name="lang_code" placeholder="Language Code" required>
+
+    <button type="submit">Get Prediction</button>
+  </form>
+
+  <div id="prediction-result">
+    </div>
+
+  <script>
+    document.getElementById('twitter-form').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      var form = this;
+      var formData = new FormData(form);
+
+      fetch(form.action, {
+        method: form.method,
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('prediction-result').textContent = "Prediction: " + data.prediction;
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    });
+  </script>
+</div>
