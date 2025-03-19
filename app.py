@@ -1,53 +1,52 @@
-<div id="twitter-fields" class="form-container">
-  <h3 class="font-medium">Twitter Input Fields</h3>
-  <form id="twitter-form" action="/predict_twitter/" method="post"> 
-    {% csrf_token %}
+import os
+import numpy as np
+import pickle  # Using pickle instead of joblib
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+from django.core.wsgi import get_wsgi_application
 
-    <label for="sex_code">Sex Code:</label>
-    <input type="number" id="sex_code" name="sex_code" placeholder="Sex Code" required>
+# Set up Django application manually (needed for Render)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fakeprofile.settings")
+application = get_wsgi_application()
 
-    <label for="statuses_count">Statuses Count:</label>
-    <input type="number" id="statuses_count" name="statuses_count" placeholder="Statuses Count" required>
+@csrf_exempt  # Disable CSRF for direct API calls
+def predict_twitter(request):
+    if request.method == 'POST':
+        try:
+            # Extract form data from POST request
+            sex_code = int(request.POST.get('sex_code'))
+            statuses_count = int(request.POST.get('statuses_count'))
+            followers_count = int(request.POST.get('followers_count'))
+            friends_count = int(request.POST.get('friends_count'))
+            favourites_count = int(request.POST.get('favourites_count'))
+            listed_count = int(request.POST.get('listed_count'))
+            lang_code = int(request.POST.get('lang_code'))  # Ensure this is an integer
 
-    <label for="followers_count">Followers Count:</label>
-    <input type="number" id="followers_count" name="followers_count" placeholder="Followers Count" required>
+            # Convert input data to NumPy array
+            input_features = np.array([[
+                sex_code, statuses_count, followers_count,
+                friends_count, favourites_count, listed_count, lang_code
+            ]])
 
-    <label for="friends_count">Friends Count:</label>
-    <input type="number" id="friends_count" name="friends_count" placeholder="Friends Count" required>
+            # Load the ML model (Ensure correct path on Render)
+            model_path = os.path.join(os.getcwd(), "model.pkl")
 
-    <label for="favourites_count">Favourites Count:</label>
-    <input type="number" id="favourites_count" name="favourites_count" placeholder="Favourites Count" required>
+            if not os.path.exists(model_path):
+                return JsonResponse({"error": "Model file not found!"}, status=500)
 
-    <label for="listed_count">Listed Count:</label>
-    <input type="number" id="listed_count" name="listed_count" placeholder="Listed Count" required>
+            # Load model using pickle (compatible with old working code)
+            with open(model_path, 'rb') as file:
+                model = pickle.load(file)
 
-    <label for="lang_code">Language Code:</label>
-    <input type="text" id="lang_code" name="lang_code" placeholder="Language Code" required>
+            # Make prediction
+            prediction = model.predict(input_features)
+            result = int(prediction[0])
 
-    <button type="submit">Get Prediction</button>
-  </form>
+            # Send JSON response
+            return JsonResponse({'prediction': "Fake" if result == 1 else "Not Fake"})
 
-  <div id="prediction-result">
-    </div>
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
 
-  <script>
-    document.getElementById('twitter-form').addEventListener('submit', function(event) {
-      event.preventDefault();
-
-      var form = this;
-      var formData = new FormData(form);
-
-      fetch(form.action, {
-        method: form.method,
-        body: formData
-      })
-      .then(response => response.json())
-      .then(data => {
-        document.getElementById('prediction-result').textContent = "Prediction: " + data.prediction;
-      })
-      .catch(error => {
-        console.error('Error:', error);
-      });
-    });
-  </script>
-</div>
+    return JsonResponse({"error": "Invalid request method"}, status=405)
