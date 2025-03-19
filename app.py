@@ -1,49 +1,37 @@
 import os
 import numpy as np
-import pickle  # Using pickle instead of joblib
+import torch
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
-from django.core.wsgi import get_wsgi_application
 
-# Set up Django application manually (needed for Render)
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fakeprofile.settings")
-application = get_wsgi_application()
+# Load PyTorch Model Once (Globally to Avoid Reloading Each Request)
+MODEL_PATH = os.path.join(os.getcwd(), "xg_model.ckpt")
+model = torch.load(MODEL_PATH)
+model.eval()  # Set model to evaluation mode
 
-@csrf_exempt  # Disable CSRF for direct API calls
+@csrf_exempt
 def predict_twitter(request):
     if request.method == 'POST':
         try:
-            # Extract form data from POST request
-            sex_code = int(request.POST.get('sex_code'))
-            statuses_count = int(request.POST.get('statuses_count'))
-            followers_count = int(request.POST.get('followers_count'))
-            friends_count = int(request.POST.get('friends_count'))
-            favourites_count = int(request.POST.get('favourites_count'))
-            listed_count = int(request.POST.get('listed_count'))
-            lang_code = int(request.POST.get('lang_code'))  # Ensure this is an integer
-
-            # Convert input data to NumPy array
+            # Extract form data
+            data = request.POST
             input_features = np.array([[
-                sex_code, statuses_count, followers_count,
-                friends_count, favourites_count, listed_count, lang_code
+                int(data['sex_code']), int(data['statuses_count']), int(data['followers_count']),
+                int(data['friends_count']), int(data['favourites_count']), int(data['listed_count']),
+                int(data['lang_code'])
             ]])
 
-            # Load the ML model (Ensure correct path on Render)
-            model_path = os.path.join(os.getcwd(), "model.pkl")
+            # Convert to PyTorch Tensor
+            input_tensor = torch.tensor(input_features, dtype=torch.float32)
 
-            if not os.path.exists(model_path):
-                return JsonResponse({"error": "Model file not found!"}, status=500)
+            # Make Prediction
+            with torch.no_grad():  # Disable gradient calculation for inference
+                prediction = model(input_tensor)
 
-            # Load model using pickle (compatible with old working code)
-            with open(model_path, 'rb') as file:
-                model = pickle.load(file)
+            # Convert Prediction to Binary (0 or 1)
+            result = int(torch.round(prediction).item())
 
-            # Make prediction
-            prediction = model.predict(input_features)
-            result = int(prediction[0])
-
-            # Send JSON response
+            # Return JSON response
             return JsonResponse({'prediction': "Fake" if result == 1 else "Not Fake"})
 
         except Exception as e:
